@@ -1,0 +1,9 @@
+[
+  {
+    "id": 1,
+    "name": "Example Product",
+    "price": "$10",
+    "image": "https://...",
+    "description": "Nice product"
+  }
+]
