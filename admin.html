@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Admin — Sheetlink</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 text-gray-800">
+  <main class="max-w-4xl mx-auto p-6">
+    <h1 class="text-2xl font-bold mb-4">Admin — Sheetlink</h1>
+
+    <div class="bg-white p-4 rounded-xl shadow mb-6">
+      <label class="block mb-2 font-medium">GitHub settings</label>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <input id="ghToken" placeholder="Personal Access Token" type="password" class="p-2 border rounded" />
+        <input id="ghOwner" placeholder="Owner (user/org)" value="medoali8052" class="p-2 border rounded" />
+        <input id="ghRepo" placeholder="Repo name" value="Sheetlink-" class="p-2 border rounded" />
+      </div>
+      <div class="text-sm text-gray-500 mt-2">Token needs <code>public_repo</code> (for public repo). Token is used only in your browser session.</div>
+    </div>
+
+    <section class="bg-white p-4 rounded-xl shadow mb-6">
+      <h2 class="font-semibold mb-3">Add new product</h2>
+      <div class="grid gap-3">
+        <input id="pName" placeholder="Name" class="p-2 border rounded" />
+        <input id="pPrice" placeholder="Price (e.g. $9.99)" class="p-2 border rounded" />
+        <textarea id="pDesc" placeholder="Description" class="p-2 border rounded"></textarea>
+
+        <label class="text-sm font-medium">Image — either URL or upload file</label>
+        <input id="pImageUrl" placeholder="Image URL (optional)" class="p-2 border rounded" />
+        <input id="pImageFile" type="file" accept="image/*" class="p-2" />
+
+        <input id="pYoutube" placeholder="YouTube link (optional)" class="p-2 border rounded" />
+        <input id="pLink" placeholder="Buy link (optional)" class="p-2 border rounded" />
+
+        <div class="flex gap-2">
+          <button id="btnAdd" class="bg-green-600 text-white px-4 py-2 rounded">Add product</button>
+          <button id="btnRefresh" class="bg-gray-200 px-4 py-2 rounded">Refresh list</button>
+          <div id="status" class="ml-3 text-sm"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bg-white p-4 rounded-xl shadow">
+      <h2 class="font-semibold mb-3">Existing products</h2>
+      <div id="list" class="space-y-3"></div>
+    </section>
+  </main>
+
+<script>
+/*
+ Admin page that:
+  - reads/writes products.json via GitHub Contents API
+  - uploads image files to assets/ (commits them) and uses raw.githubusercontent URL
+  - requires user to paste a personal access token (not stored server-side)
+  - default owner/repo are set from your input
+*/
+
+const status = (t) => { document.getElementById('status').textContent = t || ''; };
+
+async function ghRequest(path, token, method='GET', body=null) {
+  const owner = document.getElementById('ghOwner').value.trim();
+  const repo = document.getElementById('ghRepo').value.trim();
+  const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+  const headers = { Authorization: 'token ' + token, Accept: 'application/vnd.github.v3+json' };
+  const opts = { method, headers };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(url, opts);
+  if (!r.ok) throw new Error('GitHub API error: ' + r.status + ' ' + await r.text());
+  return r.json();
+}
+
+async function getProducts(token) {
+  try {
+    const res = await ghRequest('products.json', token, 'GET');
+    const content = atob(res.content.replace(/\n/g, ''));
+    return { data: JSON.parse(content), sha: res.sha };
+  } catch (err) {
+    // if not found, return empty list
+    console.warn(err);
+    return { data: [], sha: null };
+  }
+}
+
+// upload image file to assets/ folder in repo, return raw URL
+async function uploadImageFile(file, token) {
+  const owner = document.getElementById('ghOwner').value.trim();
+  const repo = document.getElementById('ghRepo').value.trim();
+  const path = 'assets/' + Date.now() + '-' + file.name.replace(/\s+/g,'-');
+  const arrayBuffer = await file.arrayBuffer();
+  const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+  const body = {
+    message: 'Add image ' + file.name,
+    content: base64
+  };
+  await ghRequest(path, token, 'PUT', body);
+  return `https://raw.githubusercontent.com/${owner}/${repo}/main/${path}`;
+}
+
+async function saveProductsFile(data, sha, token) {
+  const owner = document.getElementById('ghOwner').value.trim();
+  const repo = document.getElementById('ghRepo').value.trim();
+  const path = 'products.json';
+  const content = btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2))));
+  const body = { message: 'Update products.json', content };
+  if (sha) body.sha = sha;
+  await ghRequest(path, token, 'PUT', body);
+}
+
+async function refreshList() {
+  const token = document.getElementById('ghToken').value.trim();
+  if (!token) return status('Paste GitHub token above');
+  status('Loading products...');
+  try {
+    const { data } = await getProducts(token);
+    const list = document.getElementById('list');
+    if (!data || data.length === 0) {
+      list.innerHTML = '<div class="text-gray-500">No products found</div>'; status('');
+      return;
+    }
+    list.innerHTML = data.map(p => `
+      <div class="p-3 border rounded flex items-start gap-3">
+        <img src="${p.image}" style="width:80px;height:80px;object-fit:cover;border-radius:8px" />
+        <div class="flex-1">
+          <div class="flex justify-between items-start">
+            <div>
+              <div class="font-semibold">${escape(p.name)}</div>
+              <div class="text-sm text-gray-500">${escape(p.price)}</div>
+            </div>
+            <div class="flex gap-2">
+              <button data-id="${p.id}" class="delete-btn bg-red-500 text-white px-3 py-1 rounded">Delete</button>
+            </div>
+          </div>
+          <div class="text-sm text-gray-600 mt-2">${escape(p.description).slice(0,120)}</div>
+        </div>
+      </div>
+    `).join('');
+    // attach delete handlers
+    document.querySelectorAll('.delete-btn').forEach(btn => btn.onclick = () => deleteProduct(btn.getAttribute('data-id')));
+    status('');
+  } catch (err) {
+    console.error(err);
+    status('Error loading products: '+ err.message);
+  }
+}
+
+function escape(s){ return String(s||'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
+
+async function deleteProduct(id) {
+  if (!confirm('Delete product id ' + id + '?')) return;
+  const token = document.getElementById('ghToken').value.trim();
+  status('Loading...');
+  try {
+    const { data, sha } = await getProducts(token);
+    const idx = data.findIndex(x => String(x.id) === String(id));
+    if (idx === -1) throw new Error('Product not found');
+    data.splice(idx,1);
+    await saveProductsFile(data, sha, token);
+    status('Deleted');
+    refreshList();
+  } catch (err) { status('Delete error: '+ err.message); console.error(err); }
+}
+
+document.getElementById('btnRefresh').onclick = refreshList;
+
+document.getElementById('btnAdd').onclick = async () => {
+  const token = document.getElementById('ghToken').value.trim();
+  if (!token) return status('Paste GitHub token above');
+  const name = document.getElementById('pName').value.trim();
+  const price = document.getElementById('pPrice').value.trim();
+  const desc = document.getElementById('pDesc').value.trim();
+  const imgUrl = document.getElementById('pImageUrl').value.trim();
+  const imgFile = document.getElementById('pImageFile').files[0];
+  const youtube = document.getElementById('pYoutube').value.trim();
+  const link = document.getElementById('pLink').value.trim();
+
+  if (!name || (!imgUrl && !imgFile)) return status('Please provide name and image/url');
+
+  status('Preparing...');
+
+  try {
+    // get existing
+    const got = await getProducts(token);
+    const data = got.data || [];
+    const sha = got.sha;
+
+    // upload image file if provided
+    let finalImage = imgUrl;
+    if (imgFile) {
+      status('Uploading image to repo (this may take a few seconds)...');
+      finalImage = await uploadImageFile(imgFile, token);
+      status('Image uploaded');
+    }
+
+    // compute new id
+    const newId = data.length ? (Math.max(...data.map(x=>x.id||0))+1) : 1;
+    const newProduct = { id: newId, name, price, image: finalImage, description: desc, youtube, link };
+    data.push(newProduct);
+
+    status('Saving products.json...');
+    await saveProductsFile(data, sha, token);
+    status('Product added');
+    // reset fields
+    document.getElementById('pName').value=''; document.getElementById('pPrice').value='';
+    document.getElementById('pDesc').value=''; document.getElementById('pImageUrl').value=''; document.getElementById('pImageFile').value='';
+    document.getElementById('pYoutube').value=''; document.getElementById('pLink').value='';
+    refreshList();
+  } catch (err) {
+    console.error(err);
+    status('Error: '+ err.message);
+  }
+};
+
+// initialize
+// don't auto-run until user clicks refresh to provide token
+</script>
+</body>
+</html>
