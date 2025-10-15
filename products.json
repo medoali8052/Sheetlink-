@@ -1,13 +1,5 @@
 [
   {
-    "id": 1,
-    "name": "Custom Mug",
-    "price": "$12.99",
-    "image": "https://via.placeholder.com/300x300.png?text=Mug",
-    "description": "High-quality custom printed mug perfect for gifts or personal use.",
-    "link": "https://www.etsy.com/shop/LovingSheets?ref=shop_profile&listing_id=4324410554"
-  },
-  {
     "id": 2,
     "name": "Photo Magnet",
     "price": "$8.99",
@@ -20,7 +12,7 @@
     "name": "Canvas Print",
     "price": "$24.99",
     "image": "https://via.placeholder.com/300x300.png?text=Canvas",
-    "description": "Premium canvas print for your wall — add style to your space.",
+    "description": "Premium canvas print for your wall â add style to your space.",
     "link": "https://example.com/canvas"
   }
 ]
