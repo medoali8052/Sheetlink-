@@ -1,18 +1,10 @@
 [
   {
-    "id": 2,
-    "name": "Photo Magnet",
-    "price": "$8.99",
-    "image": "https://via.placeholder.com/300x300.png?text=Magnet",
-    "description": "Square photo magnet that sticks firmly on any metal surface.",
-    "link": "https://example.com/magnet"
-  },
-  {
     "id": 3,
     "name": "Canvas Print",
     "price": "$24.99",
     "image": "https://via.placeholder.com/300x300.png?text=Canvas",
-    "description": "Premium canvas print for your wall â add style to your space.",
+    "description": "Premium canvas print for your wall Ã¢ÂÂ add style to your space.",
     "link": "https://example.com/canvas"
   }
 ]
